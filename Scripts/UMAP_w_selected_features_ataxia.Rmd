@@ -1,0 +1,215 @@
+---
+title: "UMAP of hereditary ataxia gene lists"
+author: "Zhongbo Chen"
+date: "24/05/2022"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: kate
+    theme: paper
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+  
+```{r setup, include=F}
+
+library(tidyverse)
+library(stringr)
+library(corrplot)
+library(ggpubr)
+library(umap)
+library(G2PML)
+library(png)
+
+knitr::opts_chunk$set(echo = F, warning = F, message= F)
+
+```
+
+# 1.Feature selection: 84 features selected
+
+```{r echo = FALSE}
+
+predictor_clean <- read.csv("/home/zchen/ML/predictors/Predictor_output_files/predictor_pruned_ml_feat_scaled_all_scaled.csv")
+
+# selected features from feature selection
+ensembles = readRDS("/home/zchen/ML/scripts_workflows/ML/ML_output/new_G2PML_ensembles.rds")
+rfe_metadata <- getVarsMetaDataFromFS(allfsdata = ensembles$fs, r = 0.8, panel = "ataxia")
+
+# saveRDS(rfe_metadata, "/home/zchen/ataxia-functional-genomics/Results/input_files/rfe_metadata_features_selected.rds")
+
+# rfe_metadata$features %>% length() # 84 features selected
+
+# Data processing
+
+features <- as.data.frame(rfe_metadata$features)
+
+selected_features <- rfe_metadata$features %>% as.data.frame() %>%
+  mutate(feature = str_replace_all(vars, "\\.", " ")) %>%
+  mutate(Feature = str_replace_all(feature, "  ", ", ")) %>%
+  mutate(Feature = str_replace_all(Feature, "No,", "No.")) %>%
+  mutate(Feature = ifelse(Feature == "No. STRs in 5 UTR", "No. STRs in 5'UTR", Feature)) %>%
+   mutate(Feature = ifelse(Feature == "No. 5 UTR repetitive elements", "No. 5'UTR repetitive elements", Feature)) %>%
+  mutate(Feature = str_replace_all(Feature, "SINE ", "SINE/")) %>%
+  mutate(Feature = ifelse(Feature == "Non glutamatergic neuroblast CNS", "Non-glutamatergic neuroblast CNS", Feature)) %>%
+  mutate(Feature = ifelse(Feature == "Retroposon SVA genic density", "Retroposon/SVA genic density", Feature)) %>%
+  mutate(Feature = ifelse(Feature == "Di, and mesencephalon neurons, level 3", "Di- and mesencephalon neurons, level 3", Feature)) %>%
+  mutate(Feature = ifelse(Feature == "Density of intronic STRs", "Density of intronic STRs ", Feature)) %>%
+  mutate(Feature = ifelse(Feature == "Density of STRs", "Density of STRs ", Feature)) %>%
+  dplyr::select(-feature, -vars)
+
+selected_features
+
+# data
+predictor_clean_no_panel <- predictor_clean %>% 
+  distinct(Gene, .keep_all = TRUE) %>%
+  dplyr::select(-Panel, -Gene) %>% 
+  dplyr::select(c(features$vars)) %>% as.data.frame()
+
+# labels by gene
+prelim_gene_name <- predictor_clean %>% 
+  distinct(Gene, .keep_all = TRUE) %>% 
+  dplyr::select(Gene) %>% as.data.frame()
+
+# labels by Panel
+prelim_panel_name <- predictor_clean %>% 
+  distinct(Gene, .keep_all = TRUE) %>% 
+  dplyr::select(Panel) %>% as.data.frame()
+
+row.names(predictor_clean_no_panel) <- prelim_gene_name$Gene
+
+row.names(prelim_gene_name) <- prelim_gene_name$Gene
+
+```
+
+These are selected features (122) from the feature recursive selection process (rfe_list)
+
+# 2. UMAP plot - by panel: all ataxia genes
+
+# 2.1 UMAP of all known ataxia genes
+
+```{r echo=T}
+
+predictor_clean_no_panel_ataxia <- predictor_clean %>% 
+  filter(Panel != "Not ataxia") %>%
+  distinct(Gene, .keep_all = TRUE) %>%
+  dplyr::select(-Panel, -Gene) %>% 
+  dplyr::select(c(features$vars)) %>%
+  as.data.frame()
+
+prelim_gene_name_ataxia <- predictor_clean %>% 
+  filter(Panel != "Not ataxia") %>%
+  mutate(Panel = ifelse(Panel == "Overlap", "Overlap-onset", Panel)) %>%
+  distinct(Gene, .keep_all = TRUE) %>%
+  as.data.frame()
+
+row.names(predictor_clean_no_panel_ataxia) <- prelim_gene_name_ataxia$Gene
+row.names(prelim_gene_name_ataxia) <- prelim_gene_name_ataxia$Gene
+
+ataxia.umap = umap(predictor_clean_no_panel_ataxia)
+
+print(ataxia.umap$knn)
+print(ataxia.umap$config)
+
+```
+
+# 2.2 UMAP plot - by panel: ataxia genes
+
+```{r echo = F}
+
+layout <- data.frame(ataxia.umap$layout) %>% mutate(Panel = prelim_gene_name_ataxia$Panel)
+
+# by point
+ggplot(layout, aes(x = X1, y = X2, colour = Panel, shape = Panel)) + 
+  scale_color_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) + 
+  geom_point() + theme_bw()+
+  labs(x = "UMAP1", y = "UMAP2")
+
+
+```
+
+# 2.3 UMAP plot - by individual panels
+
+```{r echo = F, fig.width=12}
+
+layout <- data.frame(ataxia.umap$layout) %>% mutate(Panel = prelim_gene_name_ataxia$Panel)
+
+  all_ataxia <- ggplot(layout, aes(x = X1, y = X2, colour = Panel, shape = Panel)) + 
+  scale_color_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) + 
+  geom_point() + theme_bw()+
+  labs(x = "UMAP1", y = "UMAP2") +
+  scale_alpha_manual(values = alpha, guide = "none") +
+  theme(legend.position = "right")
+
+ alpha1 <- c("Adult-onset" = 0, "Childhood-onset" = 2, "Overlap" = 0)
+ alpha2 <- c("Adult-onset" = 2, "Childhood-onset" = 0, "Overlap" = 0)
+ alpha3 <- c("Adult-onset" = 0, "Childhood-onset" = 0, "Overlap" = 2)
+  
+# # by point
+childhood <- ggplot(layout, aes(x = X1, y = X2, colour = Panel, shape = Panel, alpha = Panel)) + 
+scale_color_manual(values = c("white", "#00A087FF", "white")) + 
+   geom_point() + theme_bw() +
+   labs(x = "", y = "") +
+   ggtitle("Childhood-onset genes", subtitle = "n neighbours = 15, min. distance = 0.1") +
+   theme(legend.position = "none")+
+   scale_alpha_manual(values = alpha1)+
+  labs(x = "UMAP1", y = "UMAP2")
+ 
+ adult <- ggplot(layout, aes(x = X1, y = X2, colour = Panel, shape = Panel, alpha = Panel)) + 
+   scale_color_manual(values = c("#E64B35FF", "NA", "NA")) + 
+   geom_point() + theme_bw()+
+   ggtitle("Adult-onset genes", subtitle = "n neighbours = 15, min. distance = 0.1") +
+   theme(legend.position = "none")+
+   scale_alpha_manual(values = alpha2)+
+  labs(x = "UMAP1", y = "UMAP2")
+ 
+ overlap <- ggplot(layout, aes(x = X1, y = X2, colour = Panel, shape = Panel, alpha = Panel)) + 
+   scale_color_manual(values = c("NA", "NA", "#4DBBD5FF")) + 
+   geom_point() + theme_bw() +
+   ggtitle("Overlap-onset genes", subtitle = "n neighbours = 15, min. distance = 0.1") +
+   theme(legend.position = "none")+
+   scale_alpha_manual(values = alpha3)+
+  labs(x = "UMAP1", y = "UMAP2")
+
+  UMAP <- ggarrange(adult,childhood, overlap,  
+           labels = c("A", "B", "C"),
+           common.legend = FALSE,
+             ncol = 3,
+          nrow = 1)
+  
+  UMAP
+ 
+# ggsave(UMAP,
+#         filename = "UMAP_supplementary.tiff",
+#         path = "/home/zchen/ataxia-functional-genomics/Results/Figures/",
+#         dpi = 300,
+#         width = 27,
+#         height =10,
+#         units = "cm")
+# 
+# ggsave(ataxia_umap,
+#         filename = "Fig6a.UMAP.tiff",
+#         path = "/home/zchen/ataxia-functional-genomics/Results/Figures/",
+#         dpi = 300,
+#         width = 14.5,
+#         height = 10,
+#         units = "cm")
+
+
+
+```
+
+
+
+
+
+
+```{r}
+
+sessionInfo()
+```
+
+
+
+

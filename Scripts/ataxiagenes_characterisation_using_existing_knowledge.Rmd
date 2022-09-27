@@ -1,0 +1,160 @@
+---
+title: "Characterising PanelApp hereditary ataxia genes using existing knowledge"
+author: "Zhongbo Chen"
+date: "07/05/2022"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: kate
+    theme: paper
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+  
+```{r setup, include=F}
+
+# Load libraries
+library(biomaRt)
+library(corrplot)
+library(data.table)
+library(forcats)
+library(ggpubr)
+library(readxl)
+library(rtracklayer)
+library(stringr)
+library(tidyverse)
+library(patchwork)
+
+knitr::opts_chunk$set(echo = F, warning = F, message= F)
+
+```
+
+# PanelApp Gene Sets
+The following genes used are reclassified from PanelApp Green genes, OMIM and GeneReviews (see workflow)
+
+```{r}
+
+combined_ataxia_reclassified_w_inheritance <- read_delim("/home/zchen/ataxia-functional-genomics/Results/ataxia_gene_list_w_inheritance_info.csv")
+
+```
+
+# Model of Pathogenicity
+- original PanelApp classification and simplified inheritance classification
+
+```{r}
+# By number of genes
+ggplot(data = combined_ataxia_reclassified_w_inheritance, aes(x= inheritance, fill = Panel))+
+  geom_bar(stat = "count", position = "dodge", colour = "black") + theme_classic()  +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) +
+  labs (x = "Mode of Inheritance", y = "Number of genes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+proportion_genes_inheritance <- summarise(group_by(combined_ataxia_reclassified_w_inheritance, inheritance, Panel),count =n())
+
+proportion_genes_inheritance <- proportion_genes_inheritance %>% 
+  mutate(proportion = ifelse(Panel == "Adult-onset", count/23,
+                             ifelse(Panel == "Childhood-onset", count/213,
+                                    ifelse(Panel == "Overlap-onset", count/82, 0))))
+
+inheritance_proportion <- ggplot(data = proportion_genes_inheritance, aes(x= inheritance, y = proportion, fill = Panel))+
+  geom_bar(stat = "identity", position = "dodge", colour = "black") + theme_classic() +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) +
+  labs (x = "Mode of Inheritance", y = "Proportion of genes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Merging subcategories of inheritance
+
+combined_ataxia_reclassified_w_inheritance_merged <- combined_ataxia_reclassified_w_inheritance %>%
+  mutate(inheritance = ifelse(str_detect(inheritance, "X-linked"), "X-linked", 
+                      ifelse(str_detect(inheritance, "Monoallelic"), "Monoallelic autosomal", 
+                      ifelse(str_detect(inheritance, "Mono and biallelic"), "Mono/biallelic", inheritance))))
+
+# By number of genes
+number_genes <- ggplot(data = combined_ataxia_reclassified_w_inheritance_merged, aes(x= inheritance, fill = Panel))+
+  geom_bar(stat = "count", position = "dodge", colour = "black") + theme_classic()  +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) +
+  labs (x = "Mode of Inheritance", y = "Number of genes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Proportion of genes and mode of inheritance merged
+
+proportion_genes_inheritance_merged <- summarise(group_by(combined_ataxia_reclassified_w_inheritance_merged, inheritance, Panel),count =n())
+
+proportion_genes_inheritance_merged <- proportion_genes_inheritance_merged %>% 
+  mutate(proportion = ifelse(Panel == "Adult-onset", count/23,
+                             ifelse(Panel == "Childhood-onset", count/213,
+                                    ifelse(Panel == "Overlap-onset", count/82, 0))))
+
+proportion_genes <- ggplot(data =proportion_genes_inheritance_merged, aes(x= inheritance, y = proportion, fill = Panel))+
+  geom_bar(stat = "identity", position = position_dodge2(preserve = "single"), colour = "black") + theme_bw() +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) +
+  labs (x = "Mode of Inheritance", y = "Proportion of genes") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
+
+proportion_genes 
+
+```
+
+# STRs
+ - how many diseases are secondary to known pathogenic STRs? 
+
+```{r}
+
+# Which are STRs from PanelApp?
+panelappSTRs <- read_delim("/home/zchen/ML/panelapp/new_gene_list/Panel_app_STRs.csv", delim = ",")
+
+combined_ataxia_reclassified_STRs <- combined_ataxia_reclassified_w_inheritance %>% 
+  mutate(entity = ifelse(approved_hgnc_symbol.x %in% panelappSTRs$gene_symbol, "STR", Entity_type))
+
+# STRs
+combined_ataxia_reclassified_STRs %>% filter(entity == "STR") %>% 
+  dplyr::select(c(approved_hgnc_symbol.x, Panel))%>% as.tibble()
+
+#By number of genes
+Number_STR_genes <- combined_ataxia_reclassified_STRs %>% 
+  mutate(entity = ifelse(entity == "STR", "Repeat expansion", "Not repeat")) %>%
+           ggplot(aes(x= entity, fill = entity))+
+  geom_bar(stat = "count", colour = "black") + theme_bw() +
+  facet_wrap(~Panel) +
+  scale_fill_manual(values = c("grey","darkgrey")) +
+  labs (x = "Mechanism of disease", y = "Number of genes") + 
+  theme(legend.position = "none") +
+  geom_text(stat='count', aes(label=..count..), vjust=-0.5)
+
+# By proportion of genes with STR
+
+proportion_genes_inheritance_STR <- summarise(group_by(combined_ataxia_reclassified_STRs, entity, Panel),count =n())
+
+proportion_genes_inheritance_STR <- proportion_genes_inheritance_STR %>% 
+  mutate(proportion = ifelse(Panel == "Adult-onset", count/23,
+                             ifelse(Panel == "Childhood-onset", count/213,
+                                    ifelse(Panel == "Overlap-onset", count/82, 0))))
+
+proportion_STR <- proportion_genes_inheritance_STR %>% dplyr::filter(entity == "STR") %>%
+  ggplot(aes(x= Panel, y = proportion, fill = Panel))+
+  geom_bar(stat = "identity", position = "dodge", colour = "black") + theme_classic() +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF")) +
+  labs(y = "Proportion of pathogenic STRs in panel", x = "Panel") +
+  geom_text(aes(label=round(proportion, digits = 3)), vjust=-0.5)
+
+
+```
+
+# Supplementary Figure 1
+```{r fig.height=8}
+
+#OMIM_system_involved plot from another Rmd
+
+plot <- ggarrange(proportion_genes, Number_STR_genes, nrow = 2)
+
+plot
+
+```
+
+```{r}
+
+sessionInfo()
+
+```

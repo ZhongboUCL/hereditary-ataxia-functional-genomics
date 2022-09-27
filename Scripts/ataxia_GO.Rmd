@@ -1,0 +1,178 @@
+---
+title: "Gene Ontology analysis of ataxia genes"
+author: "Zhongbo Chen"
+date: "24/05/2022"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: kate
+    theme: paper
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+```{r setup, include=F}
+
+knitr::opts_chunk$set(echo = F, warning = F, message= F)
+
+library(tidyverse)
+library(stringr)
+library(corrplot)
+library(forcats)
+library(readxl)
+library(ggpubr)
+library(rtracklayer)
+library(gprofiler2)
+library(biomaRt)
+library(GenomicRanges)
+
+# Gene lists
+adult_child_green_unique_modified <- read.csv("/home/zchen/ML/panelapp/new_gene_list/reclassified_ataxia_genes_25062020csv.csv")
+
+# Genes to test background = all protein coding genes in G2PML
+G2PML <- read.csv("/home/zchen/ataxia-functional-genomics/Results/input_files/G2PML_gene_feature_matrix.csv")
+background_genes <- G2PML$gene #17,636 genes in total
+
+```
+
+ - Test altogether then test three groups separately: Adult onset, Childhood onset, Overlap 
+
+# 1. All hereditary ataxia genes:
+
+```{r fig.width=6, fig.height=12}
+all_ataxia_genes <- adult_child_green_unique_modified$gene_symbol
+
+gprofilerOutput <- gprofiler2::gost(query = all_ataxia_genes, # if lists are named then gost can use this an input
+                                    organism = "hsapiens", # set the organism 
+                                    correction_method = "gSCS", # select a correction method (gSCS reccomended in gost documentation)
+                                    domain_scope = "custom", # select whether to restrict the background set
+                                    custom_bg = background_genes, # background gene set vector
+                                    sources = c("GO"), # databases would you like to search for pathways & processes (others: "KEGG","REAC","WP")
+                                    significant = TRUE, # when TRUE displays only significant results (p<0.05)
+                                    evcodes = TRUE, # when TRUE displays the IDs of the genes calling each pathway
+                                    ordered_query = FALSE) # when TRUE the input list is ordered in some meaningful way
+
+# 126 enriched GO terms
+result_all_genes <- gprofilerOutput$result %>%
+  dplyr::select(term_id,term_name, everything()) %>%
+  dplyr::arrange(term_id) %>%
+  distinct(term_name, .keep_all = TRUE)
+
+result_all_genes %>% as.tibble()
+
+# only show terms with p value less than median p value
+result_all_genes %>% filter(p_value <= median(p_value)) %>%
+  ggplot(aes(y = reorder(term_name, -p_value), x = -log10(p_value), fill = source)) +
+  geom_bar(stat = "identity", colour = "black") + theme_classic() +
+  scale_fill_manual(values = c("#E69F00", "purple", "grey")) +
+  labs(x = "-log(p value)", y = "GO term name")
+
+```
+
+# 2. Adult-onset ataxia genes only: No significantly enriched GO terms
+
+```{r}
+adult_genes <- adult_child_green_unique_modified %>% dplyr::filter(reclassification_category == "Adult-onset") 
+
+adult_genes <- adult_genes$gene_symbol
+  
+gprofilerOutput_adult <- gprofiler2::gost(query = adult_genes, # if lists are named then gost can use this an input
+                                    organism = "hsapiens", # set the organism 
+                                    correction_method = "gSCS", # select a correction method (gSCS reccomended in gost documentation)
+                                    domain_scope = "custom", # select whether to restrict the background set
+                                    custom_bg = background_genes, # background gene set vector
+                                    sources = c("GO"), # databases would you like to search for pathways & processes (others: "KEGG","REAC","WP")
+                                    significant = TRUE, # when TRUE displays only significant results (p<0.05)
+                                    evcodes = TRUE, # when TRUE displays the IDs of the genes calling each pathway
+                                    ordered_query = FALSE) # when TRUE the input list is ordered in some meaningful way
+
+gprofilerOutput_adult
+
+# No enriched GO terms
+
+```
+
+# 3. Childhood-onset ataxia genes only
+
+```{r fig.width=6, fig.height=12}
+child_genes <- adult_child_green_unique_modified %>% dplyr::filter(reclassification_category == "Childhood-onset")
+
+child_genes <- child_genes$gene_symbol
+
+gprofilerOutput_child <- gprofiler2::gost(query = child_genes, # if lists are named then gost can use this an input
+                                          organism = "hsapiens", # set the organism 
+                                          correction_method = "gSCS", # select a correction method (gSCS reccomended in gost documentation)
+                                          domain_scope = "custom", # select whether to restrict the background set
+                                          custom_bg = background_genes, # background gene set vector
+                                          sources = c("GO"), # databases would you like to search for pathways & processes (others: "KEGG","REAC","WP")
+                                          significant = TRUE, # when TRUE displays only significant results (p<0.05)
+                                          evcodes = TRUE, # when TRUE displays the IDs of the genes calling each pathway
+                                          ordered_query = FALSE) # when TRUE the input list is ordered in some meaningful way
+
+# 101 enriched GO terms
+result_child <- gprofilerOutput_child$result %>%
+  dplyr::select(term_id,term_name, everything()) %>%
+  dplyr::arrange(term_id) %>%
+  distinct(term_name, .keep_all = TRUE)
+
+result_child
+
+# only show terms with p value less than median p value
+#Figure 3A 
+child_graph <- result_child %>% filter(p_value <= 1.110604e-09) %>%
+  ggplot(aes(y = reorder(term_name, -p_value), x = -log10(p_value), fill = source)) +
+  geom_bar(stat = "identity", colour = "black") + theme_classic() +
+  scale_fill_manual(values = c("#E69F00", "#BE93D4", "grey")) +
+  labs(x = "-log10(P-value)", y = "GO term name", title = "Childhood-onset ataxia genes") +
+  theme(legend.position = "bottom")
+
+child_graph 
+
+```
+
+# 4. Overlap-onset ataxia genes only
+
+```{r}
+overlap_genes <- adult_child_green_unique_modified %>% dplyr::filter(reclassification_category == "Overlap")
+
+overlap_genes <- overlap_genes$gene_symbol
+
+gprofilerOutput_overlap <- gprofiler2::gost(query = overlap_genes, # if lists are named then gost can use this an input
+                                          organism = "hsapiens", # set the organism 
+                                          correction_method = "gSCS", # select a correction method (gSCS reccomended in gost documentation)
+                                          domain_scope = "custom", # select whether to restrict the background set
+                                          custom_bg = background_genes, # background gene set vector
+                                          sources = c("GO"), # databases would you like to search for pathways & processes (others: "KEGG","REAC","WP")
+                                          significant = TRUE, # when TRUE displays only significant results (p<0.05)
+                                          evcodes = TRUE, # when TRUE displays the IDs of the genes calling each pathway
+                                          ordered_query = FALSE) # when TRUE the input list is ordered in some meaningful way
+
+# 25 enriched GO terms
+result_overlap <- gprofilerOutput_overlap$result %>%
+  dplyr::select(term_id,term_name, everything()) %>%
+  dplyr::arrange(term_id) %>%
+  distinct(term_name, .keep_all = TRUE)
+
+result_overlap
+
+# Fig 3B
+overlap_graph <- result_overlap %>%
+ggplot(aes(y = reorder(term_name, -p_value), x = -log10(p_value), fill = source)) +
+  geom_bar(stat = "identity", colour = "black") + theme_classic() +
+  scale_fill_manual(values = c("#E69F00", "#BE93D4", "grey")) +
+  labs(x = "-log10(P-value)", y = "GO term name", title = "Overlap-onset ataxia genes") + theme(legend.position = "bottom")
+
+overlap_graph
+
+GSEA <- ggarrange(child_graph,overlap_graph, 
+                       ncol = 2, widths = c(30,30))
+
+```
+
+
+```{r}
+
+sessionInfo()
+
+```

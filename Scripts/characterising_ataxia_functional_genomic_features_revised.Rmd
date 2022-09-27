@@ -1,0 +1,359 @@
+---
+title: "Characterising PanelApp Ataxia genes - from collated features"
+author: "Zhongbo Chen"
+date: "07/05/2022"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: kate
+    theme: paper
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+  
+```{r setup, include=F}
+
+# Load libraries
+library(biomaRt)
+library(corrplot)
+library(data.table)
+library(forcats)
+library(ggpubr)
+library(readxl)
+library(rtracklayer)
+library(stringr)
+library(tidyverse)
+
+knitr::opts_chunk$set(echo = F, warning = F, message= F)
+
+```
+
+```{r}
+# Load gene lists and genic features
+# The following genes used are reclassified from PanelApp Green genes, OMIM and GeneReviews (see workflow)
+# Without missing values
+load_predictors <- read.csv("/home/zchen/ataxia-functional-genomics/Results/predictor_pruned_no_missing.csv")
+
+# With missing values
+load_predictors1 <- read.csv("/home/zchen/ataxia-functional-genomics/Results/input_files/updated_predictor_matrix_w_ataxia_genes.csv")
+
+# Gene lists with age-of-onset classification
+reclassified_ataxia_genes <- read.csv("/home/zchen/ataxia-functional-genomics/Results/input_files/reclassified_final_gene_list_010221.csv")
+
+# Combined features with Panel information
+features_w_panel <- load_predictors1 %>% mutate(Panel = ifelse(Panel == "Overlap", "Overlap-onset", Panel))
+
+```
+
+# 1. Features of gene structure and complexity
+```{r fig.width=10, fig.height=10}
+
+# Gather GENE FEATURES for comparison - No significant differences between different PanelApp panels
+comparisons <- list(c("Adult-onset", "Childhood-onset"), c("Adult-onset", "Overlap-onset"), c("Adult-onset", "Not ataxia"),
+                    c("Childhood-onset", "Overlap-onset"), c("Childhood-onset", "Not ataxia"),
+                     c("Overlap-onset", "Not ataxia"))
+comparisons1 <- list(c("Adult-onset", "Childhood-onset"), c("Adult-onset", "Overlap-onset"), c("Childhood-onset", "Overlap-onset"))
+comparisons2 <- list(c("Adult-onset", "Childhood-onset"), c("Adult-onset", "Overlap-onset"), c("Childhood-onset", "Overlap-onset"),
+                     c("Overlap-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"), c("Adult-onset", "Not ataxia"))
+comparisons3 <- list(c("Overlap-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"), c("Adult-onset", "Not ataxia"))
+
+order <- c("Adult-onset", "Childhood-onset", "Overlap-onset", "Not ataxia")
+
+# Gene features comparison: Note string differences despite no differences in gene length
+
+# Figure 1C
+transcript_count <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = TranscriptCount, fill = Panel))+
+  geom_boxplot(notch = TRUE) +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of transcripts per gene", title = "Number of transcripts per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = comparisons3, hide.ns = TRUE) +
+  theme(plot.title = element_text(face="bold"))
+
+# Figure 1D
+junction_count <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = NumJunctions, fill = Panel))+
+  geom_boxplot(notch = TRUE) +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of junctions per gene", title = "Number of junctions per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = comparisons3, hide.ns = TRUE)+
+  theme(plot.title = element_text(face="bold"))
+
+# Compare gene features of gene complexity/ stucture
+fun_median <- function(x){
+  return(data.frame(y=median(x),label=round(median(x,na.rm=T), 2),nsmall = 3))
+  }
+
+# Plot with median values shown below the red point (median)
+features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>% 
+  tidyr::gather("type", "Gene_feature", c(2, 4, 6:7)) %>%
+  ggplot(aes(x= Panel, y=Gene_feature, fill = Panel))+
+  geom_boxplot() + theme_classic() +
+  facet_wrap(~type, scales = "free_y", ncol = 2) +
+  stat_compare_means(comparisons = comparisons2, hide.ns = FALSE, label = "p.signif") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  labs(y = "Gene feature", x = "Panel") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) + 
+  theme(legend.position="bottom", axis.text = element_blank())+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)
+
+```
+
+## 1.1 STR features
+- See script for STR annotation generation for more details
+
+```{r}
+
+STR_comparisons <- list(c("Childhood-onset", "Not ataxia"), c("Adult-onset", "Not ataxia"))
+fun_median <- function(x){
+  return(data.frame(y=median(x),label=round(median(x,na.rm=T), 2),nsmall = 3))
+  }
+
+
+# Figure 2B
+number_of_STRs_per_gene <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = number_STRs, fill = Panel))+
+  geom_boxplot() +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of STRs per gene", title = "Number of STRs per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = STR_comparisons, hide.ns = TRUE)+
+  theme(axis.text.x = element_blank()) +
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
+  theme(plot.title = element_text(face="bold"))
+
+number_of_STRs_per_gene
+
+# Figure 2C
+number_of_trinucleotides_per_gene <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = X3nt, fill = Panel))+
+  geom_boxplot() +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of trinucleotide STRs per gene", title = "Number of trinucleotide STRs per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = list(c("Adult-onset", "Not ataxia")), hide.ns = TRUE)+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(face="bold"))
+
+number_of_trinucleotides_per_gene
+
+```
+
+## 1.2 Repetitive elements
+- Annotation adapted from http://www.repeatmasker.org/species/hg.html
+
+```{r}
+
+# Figure 2D
+eSTR_comparisons <- list(c("Childhood-onset", "Not ataxia"), c("Overlap-onset", "Not ataxia"))
+
+number_eSTRs_per_gene <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = number_eSTRs, fill = Panel))+
+  geom_boxplot() +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of eSTRs per gene", title = "Number of eSTRs per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = eSTR_comparisons, hide.ns = TRUE)+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5) +
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(face="bold"))
+
+number_eSTRs_per_gene
+
+# Figure 2E
+
+number_eSTR_tissues <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = mean_number_tissues, fill = Panel))+
+  geom_boxplot() +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of tissues associated with eSTRs", title = "Number of tissues associated with eSTRs") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = eSTR_comparisons, hide.ns = TRUE)+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(face="bold"))
+
+number_eSTR_tissues
+
+# Figure 2F
+
+Line_comparisons <- list(c("Adult-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"))
+
+LINEL1 <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = LINE.L1, fill = Panel))+
+  geom_boxplot() +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of LINE/L1 elements per gene", title = "Number of LINE/L1 elements per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(method = "wilcox", comparisons = Line_comparisons)+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(face="bold"))
+
+LINEL1 
+
+```
+
+
+## 1.3 Supplementary Figure 2 - All repeat elements
+
+```{r fig.width=12, fig.height=10}
+
+ Suppl_Fig2 <- features_w_panel%>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>% 
+  tidyr::gather("type", "Gene_feature", c(2, 4, 6:7, 332, 329, 326, 327)) %>%
+  ggplot(aes(x= Panel, y=Gene_feature, fill = Panel))+
+  geom_boxplot() + theme_bw() +
+  facet_wrap(~type, scales = "free_y", ncol = 4) +
+  stat_compare_means(comparisons = comparisons, hide.ns = FALSE, label = "p.signif") +
+  theme(axis.text.x = element_blank())+
+  labs(y = "Gene feature", x = "Panel") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) + 
+  theme(legend.position="bottom")+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)
+
+Suppl_Fig2
+
+```
+
+
+# 2. Genetic Variation
+
+## 2.1 CNCR density
+
+```{r}
+
+# Figure 2G
+
+CNCR_comparisons <- list(c("Childhood-onset", "Not ataxia"), c("Overlap-onset", "Not ataxia"))
+
+CNCRs <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = CNCR_density, fill = Panel))+
+  geom_boxplot() +
+  theme_bw()  +
+  labs (x = "Panel", y = "CNCR density per gene", title = "Constrained, non-conserved regions") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(method = "wilcox", comparisons = CNCR_comparisons)+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 3.5)+
+  theme(axis.text.x = element_blank())+
+  theme(plot.title = element_text(face="bold"))
+
+CNCRs 
+
+# Figure 2
+
+Fig2 <- ggarrange(number_of_STRs_per_gene, number_of_trinucleotides_per_gene, number_eSTRs_per_gene,
+                   number_eSTR_tissues, LINEL1, CNCRs, #from another file
+           labels = c("B", "C", "D", "E", "F", "G"),
+           ncol = 3, nrow = 2,
+           legend = "bottom", common.legend = TRUE)
+
+```
+
+## 2.2 All measures of variation
+
+```{r fig.width=10, fig.height=12} 
+ Suppl_Fig3 <- features_w_panel%>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>% 
+  tidyr::gather("type", "Gene_feature", c(9:17)) %>%
+  ggplot(aes(x= Panel, y=Gene_feature, fill = Panel))+
+  geom_boxplot() + theme_bw() +
+  facet_wrap(~type, scales = "free_y", ncol = 3) +
+  stat_compare_means(comparisons = comparisons, hide.ns = FALSE, label = "p.signif") +
+  theme(axis.text.x = element_blank())+
+  labs(y = "Gene feature measuring genetic variation", x = "Panel") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) + 
+  theme(legend.position="bottom")+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)
+ 
+Suppl_Fig3
+
+```
+
+
+# 3. Gene Expression
+
+## Developmentally dynamic genes specific to human organs
+ - From Kaessmann data (Cardoso-Moreira et al. Nature 571: 505-509. 2019)
+
+```{r}
+
+DDGs <- features_w_panel %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = Human_Cerebellum, fill = Panel))+
+  geom_boxplot() +
+  theme_classic()  +
+  labs (x = "Panel", y = "Pleiotropy index", title = "Developmental gene expression in cerebellum") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(method = "wilcox", comparisons = list(c("Childhood-onset", "Not ataxia")))+
+  stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
+  stat_summary(fun.data = fun_median, geom="text", vjust= 3.5)+
+  theme(legend.position = "right")
+
+DDGs
+ 
+```
+
+# 4. FUSIL
+ - Cross-species gene classification across the Full Spectrum of Intolerance to Loss-of-function (FUSIL)
+ - Cacheiro et al. Nature Communications volume 11, Article number: 655 (2020)
+ - Classification:  CL cellular lethal, DL developmental lethal, SV subviable, VP viable with phenotypic abnormalities, VN viable with normal phenotype. 
+ 
+```{r}
+
+FUSIL_plot <- features_w_panel %>% tidyr::gather("type", "FUSIL", 310:314) %>%
+  filter(Panel != "Not ataxia") %>% filter(FUSIL != "NA") %>%
+  mutate(FUSIL = ifelse(FUSIL == "0", "No", "Yes")) %>%
+  ggplot(aes(x= as.character(FUSIL), fill = Panel))+ facet_wrap(~type) +
+  geom_bar(stat = "count", position = position_dodge2(preserve = "single"), colour = "black") + 
+  facet_wrap(~type, scales = "free_y", ncol = 5) +  
+  theme_classic()  +
+  labs (x = "FUSIL category", y = "Number of genes") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF"))  +
+  theme(legend.position = "bottom")
+
+FUSIL_plot
+
+```
+
+
+```{r}
+
+sessionInfo()
+
+```

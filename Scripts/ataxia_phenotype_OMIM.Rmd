@@ -1,0 +1,213 @@
+---
+title: "Ataxia panel genes - Phenotype correlations"
+author: "Zhongbo Chen"
+date: "07/05/2022"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: kate
+    theme: paper
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+```{r setup, include=F}
+
+library(data.table)
+library(ggpubr)
+library(readxl)
+library(stringr)
+library(tidyverse)
+
+adult_child_green_unique_modified <- read.csv("/home/zchen/ataxia-functional-genomics/Results/reclassified_final_gene_list_010221.csv")
+adult_child_green_unique_modified <- adult_child_green_unique_modified %>% dplyr::mutate(Panel = reclassification_category)
+
+```
+
+# 1. HPO terms
+- Use HPO annotation from http://compbio.charite.de/jenkins/job/hpo.annotations/lastStableBuild/ 
+https://hpo.jax.org/app/download/annotation
+- The HPO annotation is complete, recently updated and contains phenotypic information from both OMIM and Orphanet
+- Downloaded HPO: Build #1272: Download gene to phenotype file:
+download.file("http://compbio.charite.de/jenkins/job/hpo.annotations/lastStableBuild/artifact/util/annotation/genes_to_phenotype.txt",
+               destfile = "/home/zchen/ML/panelapp/HPO_gene_to_phenotype.txt")
+
+```{r echo = FALSE}
+# All non-ataxia and ataxia genes
+
+all_genes_HPO <- read.csv("/home/zchen/ataxia-functional-genomics/Results/input_files/HPO_gene_list.csv") 
+ 
+order <- c("Adult-onset", "Childhood-onset", "Overlap-onset", "Not ataxia")
+
+# Assign panel to gene
+
+adult_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "Adult-onset") 
+child_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "Childhood-onset")
+overlap_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "Overlap-onset") 
+
+# Figure 1A
+ 
+ # Count number of HPO terms per gene
+ count_HPO_per_gene <- as.data.frame(table(all_genes_HPO$gene_symbol))
+
+ # Annotate with age-of-onset classification
+ annotated_HPO_count_per_gene <- count_HPO_per_gene %>% left_join(all_genes_HPO, by = c("Var1" = "gene_symbol")) %>%
+   dplyr::select(c(Var1, Freq, Panel)) %>% distinct(Var1, Freq, Panel) 
+ 
+ 
+comparisons2 <- list(c("Adult-onset", "Childhood-onset"), c("Adult-onset", "Overlap-onset"), 
+                     c("Overlap-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"))
+
+ 
+number_HPO_terms <- annotated_HPO_count_per_gene  %>% filter(Panel !="NA") %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = Freq, fill = Panel))+
+  geom_boxplot(notch = TRUE)  +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of HPO terms associated with each gene", title = "Number of HPO terms per gene") +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  theme(legend.position = "none") +
+  stat_compare_means(comparisons = comparisons2, hide.ns = TRUE) +
+  theme(plot.title = element_text(face="bold"))
+
+ number_HPO_terms
+ 
+```
+
+# 2.1 Types of associated clinical features and number of systems affected per gene
+
+```{r echo = FALSE, fig.width= 9, fig.height=5}
+
+OMIM_phenotype_tidy <- read.csv("/home/zchen/ataxia-functional-genomics/Results/input_files/OMIM_clinical_synopsis.csv")
+
+OMIM_phenotype_tidy_ataxia_Ens <- OMIM_phenotype_tidy %>% 
+    dplyr::mutate(Panel = ifelse(ensembl_gene_id %in% adult_genes$ensembl_gene_id, "Adult-onset", 
+                          ifelse(ensembl_gene_id %in% child_genes$ensembl_gene_id, "Childhood-onset",
+                          ifelse(ensembl_gene_id %in% overlap_genes$ensembl_gene_id, "Overlap-onset", "Not ataxia")))) %>%
+    dplyr::distinct(ensembl_gene_id, .keep_all = TRUE)
+
+
+# Count number of features
+
+OMIM_phenotype_tidy_ataxia_features <- OMIM_phenotype_tidy_ataxia_Ens %>%
+  dplyr::select(gene_symbol, approved_hgnc_symbol, 27:48, Panel) %>%
+  mutate(abdomen_count = ifelse(is.na(abdomen), 0, 1)) %>%
+  mutate(cardiovascular_count = ifelse(is.na(cardiovascular), 0, 1)) %>%
+  mutate(chest_count = ifelse(is.na(chest), 0, 1)) %>%
+  mutate(cardiovascular_count = ifelse(is.na(cardiovascular), 0, 1)) %>%
+  mutate(endocrine_features_count = ifelse(is.na(endocrine_features), 0, 1)) %>%
+  mutate(genitourinary_count = ifelse(is.na(genitourinary), 0, 1)) %>%
+  mutate(growth_count = ifelse(is.na(growth), 0, 1)) %>%
+  mutate(head_and_neck_count = ifelse(is.na(head_and_neck), 0, 1)) %>%
+  mutate(hematology_count = ifelse(is.na(hematology), 0, 1)) %>%
+  mutate(immunology_count = ifelse(is.na(immunology), 0, 1)) %>%
+  mutate(metabolic_features_count = ifelse(is.na(metabolic_features), 0, 1)) %>%
+  mutate(muscle_soft_tissue_count = ifelse(is.na(muscle_soft_tissue), 0, 1)) %>%
+  mutate(neoplasia_count = ifelse(is.na(neoplasia), 0, 1)) %>%
+  mutate(neurologic_count = ifelse(is.na(neurologic), 0, 1)) %>%
+  mutate(respiratory_count = ifelse(is.na(respiratory), 0, 1)) %>%
+  mutate(skin_nails_hair_count = ifelse(is.na(skin_nails_hair), 0, 1)) %>%
+  mutate(voice_count = ifelse(is.na(voice), 0, 1)) %>%
+  mutate(prenatal_manifestations_count = ifelse(is.na(prenatal_manifestations), 0, 1)) %>%
+  mutate(laboratory_abnormalities_count = ifelse(is.na(laboratory_abnormalities), 0, 1)) %>%
+  mutate(miscellaneous_count = ifelse(is.na(miscellaneous), 0, 1)) %>%
+  mutate(features_per_gene = rowSums(.[26:41])) 
+
+
+# Number of systems affected per gene
+
+comparisons3 <- list(c("Adult-onset", "Childhood-onset"), c("Childhood-onset", "Overlap-onset"),
+                     c("Overlap-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"))
+fun_median <- function(x){
+  return(data.frame(y=median(x),label=round(median(x,na.rm=T), 2),nsmall = 3))
+}
+
+number_OMIM_per_gene <- OMIM_phenotype_tidy_ataxia_features %>% 
+  mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
+  arrange(Panel) %>%
+  ggplot(aes(x= Panel, y = features_per_gene, fill = Panel))+
+  geom_boxplot(notch = TRUE) +
+  theme_bw()  +
+  labs (x = "Panel", y = "Number of systems affected per gene", title = "Number of systems affected per gene (OMIM)" ) +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  stat_compare_means(comparisons = comparisons3)+
+  theme(plot.title = element_text(face="bold"))
+
+  number_OMIM_per_gene
+
+```
+
+# 2.2 What are the other systems involved? 
+
+```{r echo = FALSE, fig.width=10, fig.height=15}
+
+OMIM_phenotype_tidy_ataxia_features_modified <- OMIM_phenotype_tidy_ataxia_features %>% 
+  dplyr::select(gene_symbol, Panel, 26:44)
+
+column_names <- as.list(colnames(OMIM_phenotype_tidy_ataxia_features_modified ))
+column_names_replaced <- str_replace_all(column_names, "_count", "")
+column_names_replaced1 <- str_replace_all(column_names_replaced, "_features", "")
+colnames(OMIM_phenotype_tidy_ataxia_features_modified) <- column_names_replaced1
+
+
+OMIM_proportions <- OMIM_phenotype_tidy_ataxia_features_modified %>% 
+  gather("type", "system", 3:18) %>%
+  filter(system == 1) %>%
+  count(type, Panel, sort = TRUE, name = "number") %>%
+  mutate(Proportion = ifelse(Panel == "Adult-onset", number/22,
+                             ifelse(Panel == "Childhood-onset", number/209, number/81)))
+
+# Overall
+
+overall <- OMIM_proportions %>%
+  ggplot(aes(x= reorder(type, -Proportion), y = Proportion, fill = Panel))+
+  geom_bar(stat = "identity", position = "dodge") + theme_classic() +
+  scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
+  labs (x = "System involved", y = "Proportion of genes for Panel") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(legend.position="bottom")
+  
+  
+# Adult_onset
+adult <- OMIM_proportions %>% filter(Panel == "Adult-onset") %>%
+  ggplot(aes(x= reorder(type, -Proportion), y = Proportion, fill = Panel))+
+  geom_bar(stat = "identity", colour = "black") + theme_classic() +
+  scale_fill_manual(values = "#E64B35FF") +
+  labs (x = "System involved", y = "Proportion of genes for Panel")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(legend.position="bottom")
+
+# Child_onset
+child <- OMIM_proportions %>% filter(Panel == "Childhood-onset") %>%
+  ggplot(aes(x= reorder(type, -Proportion), y = Proportion, fill = Panel))+
+  geom_bar(stat = "identity", colour = "black") + theme_classic() +
+  scale_fill_manual(values = "#00A087FF") +
+  labs (x = "System involved", y = "Proportion of genes for Panel")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(legend.position="bottom")
+  
+  # Overlap
+overlap <- OMIM_proportions %>% filter(Panel == "Overlap-onset") %>%
+  ggplot(aes(x= reorder(type, -Proportion), y = Proportion, fill = Panel))+
+  geom_bar(stat = "identity", colour = "black") + theme_classic() +
+  scale_fill_manual(values = "#4DBBD5FF") +
+  labs (x = "System involved", y = "Proportion of genes for Panel")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  theme(legend.position="bottom")
+
+OMIM_system_involved <- ggarrange(adult, child, overlap,  
+                       ncol = 1, nrow = 3,legend = "none",
+                        vjust = 1)
+
+OMIM_system_involved
+
+```
+
+
+```{r}
+
+sessionInfo()
+
+```
