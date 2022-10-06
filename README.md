@@ -8,6 +8,9 @@ This repository contains analysis code for the publication, "Functional genomics
 
 All code relating to analysis of whole genome sequencing data of 100,000 Genomes Project participants are only available within the Genomics England Research Environment upon reasonable request from the authors. 
 
+# Contents
+Interactive `.html`s can be viewed here: https://zhongboucl.github.io/hereditary-ataxia-functional-genomics/
+
 # Citation
 
 If you use any of the code or data from this repository, please cite our paper (https://www.medrxiv.org/content/10.1101/2022.06.24.22276803v1).
