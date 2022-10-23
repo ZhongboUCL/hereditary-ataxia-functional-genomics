@@ -16,6 +16,7 @@ output:
 
 library(data.table)
 library(ggpubr)
+library(ggprism)
 library(readxl)
 library(stringr)
 library(tidyverse)
@@ -46,7 +47,7 @@ adult_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "Adu
 child_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "Childhood-onset")
 overlap_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "Overlap-onset") 
 
-# Figure 1A
+# Figure 2A
  
  # Count number of HPO terms per gene
  count_HPO_per_gene <- as.data.frame(table(all_genes_HPO$gene_symbol))
@@ -59,7 +60,6 @@ overlap_genes <- adult_child_green_unique_modified %>% dplyr::filter(Panel == "O
 comparisons2 <- list(c("Adult-onset", "Childhood-onset"), c("Adult-onset", "Overlap-onset"), 
                      c("Overlap-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"))
 
- 
 number_HPO_terms <- annotated_HPO_count_per_gene  %>% filter(Panel !="NA") %>% 
   mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
   arrange(Panel) %>%
@@ -75,6 +75,7 @@ number_HPO_terms <- annotated_HPO_count_per_gene  %>% filter(Panel !="NA") %>%
  number_HPO_terms
  
 ```
+
 
 # 2.1 Types of associated clinical features and number of systems affected per gene
 
@@ -116,7 +117,7 @@ OMIM_phenotype_tidy_ataxia_features <- OMIM_phenotype_tidy_ataxia_Ens %>%
   mutate(features_per_gene = rowSums(.[26:41])) 
 
 
-# Number of systems affected per gene
+# Number of systems affected per gene Figure 2B
 
 comparisons3 <- list(c("Adult-onset", "Childhood-onset"), c("Childhood-onset", "Overlap-onset"),
                      c("Overlap-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"))

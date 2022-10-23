@@ -124,7 +124,7 @@ child_graph <- result_child %>% filter(p_value <= 1.110604e-09) %>%
   ggplot(aes(y = reorder(term_name, -p_value), x = -log10(p_value), fill = source)) +
   geom_bar(stat = "identity", colour = "black") + theme_classic() +
   scale_fill_manual(values = c("#E69F00", "#BE93D4", "grey")) +
-  labs(x = "-log10(P-value)", y = "GO term name", title = "Childhood-onset ataxia genes") +
+  labs(x = expression(paste("-log10(" , italic("P"),"-value)")), y = "GO term name", title = "Childhood-onset ataxia genes") +
   theme(legend.position = "bottom")
 
 child_graph 
@@ -156,12 +156,12 @@ result_overlap <- gprofilerOutput_overlap$result %>%
 
 result_overlap
 
-# Fig 3B
+# Fig 5
 overlap_graph <- result_overlap %>%
 ggplot(aes(y = reorder(term_name, -p_value), x = -log10(p_value), fill = source)) +
   geom_bar(stat = "identity", colour = "black") + theme_classic() +
   scale_fill_manual(values = c("#E69F00", "#BE93D4", "grey")) +
-  labs(x = "-log10(P-value)", y = "GO term name", title = "Overlap-onset ataxia genes") + theme(legend.position = "bottom")
+  labs(x = expression(paste("-log10(" , italic("P"),"-value)")), y = "GO term name", title = "Overlap-onset ataxia genes") + theme(legend.position = "bottom")
 
 overlap_graph
 

@@ -63,7 +63,7 @@ order <- c("Adult-onset", "Childhood-onset", "Overlap-onset", "Not ataxia")
 
 # Gene features comparison: Note string differences despite no differences in gene length
 
-# Figure 1C
+# Figure 2C
 transcript_count <- features_w_panel %>% 
   mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
   arrange(Panel) %>%
@@ -75,7 +75,7 @@ transcript_count <- features_w_panel %>%
   stat_compare_means(comparisons = comparisons3, hide.ns = TRUE) +
   theme(plot.title = element_text(face="bold"))
 
-# Figure 1D
+# Figure 2D
 junction_count <- features_w_panel %>% 
   mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
   arrange(Panel) %>%
@@ -121,7 +121,7 @@ fun_median <- function(x){
   }
 
 
-# Figure 2B
+# Figure 3B
 number_of_STRs_per_gene <- features_w_panel %>% 
   mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
   arrange(Panel) %>%
@@ -133,12 +133,10 @@ number_of_STRs_per_gene <- features_w_panel %>%
   stat_compare_means(comparisons = STR_comparisons, hide.ns = TRUE)+
   theme(axis.text.x = element_blank()) +
   stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
-  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
-  theme(plot.title = element_text(face="bold"))
-
+  stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)
 number_of_STRs_per_gene
 
-# Figure 2C
+# Figure 3C
 number_of_trinucleotides_per_gene <- features_w_panel %>% 
   mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
   arrange(Panel) %>%
@@ -150,19 +148,17 @@ number_of_trinucleotides_per_gene <- features_w_panel %>%
   stat_compare_means(comparisons = list(c("Adult-onset", "Not ataxia")), hide.ns = TRUE)+
   stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
   stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
-  theme(axis.text.x = element_blank())+
-  theme(plot.title = element_text(face="bold"))
+  theme(axis.text.x = element_blank())
 
 number_of_trinucleotides_per_gene
 
 ```
 
-## 1.2 Repetitive elements
-- Annotation adapted from http://www.repeatmasker.org/species/hg.html
+## 1.2 eSTR features
 
 ```{r}
 
-# Figure 2D
+# Figure 3D
 eSTR_comparisons <- list(c("Childhood-onset", "Not ataxia"), c("Overlap-onset", "Not ataxia"))
 
 number_eSTRs_per_gene <- features_w_panel %>% 
@@ -176,12 +172,27 @@ number_eSTRs_per_gene <- features_w_panel %>%
   stat_compare_means(comparisons = eSTR_comparisons, hide.ns = TRUE)+
   stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
   stat_summary(fun.data = fun_median, geom="text", vjust= 1.5) +
-  theme(axis.text.x = element_blank())+
-  theme(plot.title = element_text(face="bold"))
+  theme(axis.text.x = element_blank())
 
 number_eSTRs_per_gene
 
-# Figure 2E
+# Figure 3E
+
+stat.test <- compare_means(mean_number_tissues~Panel, data = features_w_panel, hide.ns = TRUE) 
+stat.test.1 <- stat.test %>% dplyr::filter(p < 0.05)
+
+df_p_val <- data.frame(
+  group1 = stat.test.1$group1,
+  group2 = stat.test.1$group2,
+  label = stat.test.1$p,
+  y.position = c(18, 20)
+)
+
+df_p_val1 <- df_p_val %>% mutate(Panel = group1) %>% 
+  dplyr::filter(label < 0.05) %>%
+  mutate(label = signif(label, 2)) %>%
+  mutate(label = str_replace_all(as.character(label), "e", "x10^"))
+  
 
 number_eSTR_tissues <- features_w_panel %>% 
   mutate(Panel = Panel %>% factor() %>% fct_relevel(order)) %>% 
@@ -191,16 +202,21 @@ number_eSTR_tissues <- features_w_panel %>%
   theme_bw()  +
   labs (x = "Panel", y = "Number of tissues associated with eSTRs", title = "Number of tissues associated with eSTRs") +
   scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF", "#3C5488FF")) +
-  stat_compare_means(comparisons = eSTR_comparisons, hide.ns = TRUE)+
+  stat_pvalue_manual(df_p_val1) +
   stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
   stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
-  theme(axis.text.x = element_blank())+
-  theme(plot.title = element_text(face="bold"))
+  theme(axis.text.x = element_blank())
 
 number_eSTR_tissues
 
-# Figure 2F
 
+```
+
+## 1.3 Repetitive Elements
+
+```{r}
+
+# Figure 3F
 Line_comparisons <- list(c("Adult-onset", "Not ataxia"), c("Childhood-onset", "Not ataxia"))
 
 LINEL1 <- features_w_panel %>% 
@@ -214,15 +230,14 @@ LINEL1 <- features_w_panel %>%
   stat_compare_means(method = "wilcox", comparisons = Line_comparisons)+
   stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
   stat_summary(fun.data = fun_median, geom="text", vjust= 1.5)+
-  theme(axis.text.x = element_blank())+
-  theme(plot.title = element_text(face="bold"))
+  theme(axis.text.x = element_blank())
 
 LINEL1 
 
 ```
 
 
-## 1.3 Supplementary Figure 2 - All repeat elements
+## 1.4 Supplementary Figure 2 - All repeat elements
 
 ```{r fig.width=12, fig.height=10}
 
@@ -252,7 +267,7 @@ Suppl_Fig2
 
 ```{r}
 
-# Figure 2G
+# Figure 3G
 
 CNCR_comparisons <- list(c("Childhood-onset", "Not ataxia"), c("Overlap-onset", "Not ataxia"))
 
@@ -267,14 +282,13 @@ CNCRs <- features_w_panel %>%
   stat_compare_means(method = "wilcox", comparisons = CNCR_comparisons)+
   stat_summary(fun.y = median, geom="point",colour="darkred", size=2) +
   stat_summary(fun.data = fun_median, geom="text", vjust= 3.5)+
-  theme(axis.text.x = element_blank())+
-  theme(plot.title = element_text(face="bold"))
+  theme(axis.text.x = element_blank())
 
 CNCRs 
 
-# Figure 2
+# Figure 3
 
-Fig2 <- ggarrange(number_of_STRs_per_gene, number_of_trinucleotides_per_gene, number_eSTRs_per_gene,
+Figure3 <- ggarrange(number_of_STRs_per_gene, number_of_trinucleotides_per_gene, number_eSTRs_per_gene,
                    number_eSTR_tissues, LINEL1, CNCRs, #from another file
            labels = c("B", "C", "D", "E", "F", "G"),
            ncol = 3, nrow = 2,
@@ -345,7 +359,7 @@ FUSIL_plot <- features_w_panel %>% tidyr::gather("type", "FUSIL", 310:314) %>%
   theme_classic()  +
   labs (x = "FUSIL category", y = "Number of genes") +
   scale_fill_manual(values = c("#E64B35FF", "#00A087FF", "#4DBBD5FF"))  +
-  theme(legend.position = "bottom")
+  theme(legend.position = "right")
 
 FUSIL_plot
 

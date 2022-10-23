@@ -180,21 +180,7 @@ scale_color_manual(values = c("white", "#00A087FF", "white")) +
   
   UMAP
  
-# ggsave(UMAP,
-#         filename = "UMAP_supplementary.tiff",
-#         path = "/home/zchen/ataxia-functional-genomics/Results/Figures/",
-#         dpi = 300,
-#         width = 27,
-#         height =10,
-#         units = "cm")
-# 
-# ggsave(ataxia_umap,
-#         filename = "Fig6a.UMAP.tiff",
-#         path = "/home/zchen/ataxia-functional-genomics/Results/Figures/",
-#         dpi = 300,
-#         width = 14.5,
-#         height = 10,
-#         units = "cm")
+
 
 
 
