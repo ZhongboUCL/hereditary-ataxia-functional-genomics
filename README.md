@@ -13,7 +13,7 @@ Interactive `.html`s can be viewed here: https://zhongboucl.github.io/hereditary
 
 # Citation
 
-If you use any of the code or data from this repository, please cite our paper (https://www.medrxiv.org/content/10.1101/2022.06.24.22276803v1).
+If you use any of the code or data from this repository, please cite our paper: Chen et al. (2023) Brain, awad009, https://doi.org/10.1093/brain/awad009. (https://academic.oup.com/brain/advance-article/doi/10.1093/brain/awad009/6979910).
 
 # License
 
