@@ -76,6 +76,7 @@ number_HPO_terms <- annotated_HPO_count_per_gene  %>% filter(Panel !="NA") %>%
  
 ```
 
+# 2. Using information from OMIM
 
 # 2.1 Types of associated clinical features and number of systems affected per gene
 
